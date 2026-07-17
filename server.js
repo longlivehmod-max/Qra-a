@@ -3,7 +3,8 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const pdfParse = require("pdf-parse");
-const { GoogleGenAI } = require("@google/generative-ai");
+// الطريقة الأكثر استقراراً للتوافق مع جميع إصدارات المكتبة
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
 app.use(cors());
@@ -11,10 +12,8 @@ app.use(express.json({ limit: "10mb" }));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// تهيئة العميل لـ Gemini
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+// تهيئة العميل باستخدام الاسم المستقر
+const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // ---------- Route رقم 1: استخراج النص من PDF ----------
 app.post("/extract-text", upload.single("file"), async (req, res) => {
