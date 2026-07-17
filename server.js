@@ -3,7 +3,6 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const pdfParse = require("pdf-parse");
-// الطريقة الأكثر استقراراً للتوافق مع جميع إصدارات المكتبة
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
@@ -11,9 +10,6 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
 const upload = multer({ storage: multer.memoryStorage() });
-
-// تهيئة العميل باستخدام الاسم المستقر
-const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // ---------- Route رقم 1: استخراج النص من PDF ----------
 app.post("/extract-text", upload.single("file"), async (req, res) => {
@@ -61,6 +57,14 @@ app.post("/generate-questions", async (req, res) => {
 نص المادة:
 ${trimmedText}`;
 
+    // تهيئة العميل هنا بشكل حي ومباشر لضمان قراءة المفتاح من بيئة Railway السحابية
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "API key is missing in environment variables" });
+    }
+    
+    const ai = new GoogleGenerativeAI(apiKey);
+
     const model = ai.getGenerativeModel({ 
       model: "gemini-1.5-flash",
       generationConfig: { responseMimeType: "application/json" }
@@ -74,7 +78,7 @@ ${trimmedText}`;
     res.json(parsed);
 
   } catch (err) {
-    console.error(err);
+    console.error("Gemini Error:", err);
     res.status(500).json({ error: "فشل توليد الأسئلة" });
   }
 });
