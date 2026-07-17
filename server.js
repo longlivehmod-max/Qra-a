@@ -1,7 +1,7 @@
 // ==========================================================
 // خادم بسيط له مهمتان:
 // 1) استقبال ملف PDF من التطبيق واستخراج النص منه (/extract-text)
-// 2) أخذ نص المادة وتوليد أسئلة اختبار عنه عبر Claude (/generate-questions)
+// 2) أخذ نص المادة وتوليد أسئلة اختبار عنه عبر Gemini (/generate-questions)
 // ==========================================================
 
 require("dotenv").config();
@@ -9,7 +9,8 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const pdfParse = require("pdf-parse");
-const Anthropic = require("@anthropic-ai/sdk");
+// 1. استدعاء مكتبة Google Gemini بدلاً من Anthropic
+const { GoogleGenAI } = require("@google/generative-ai");
 
 const app = express();
 app.use(cors());
@@ -18,8 +19,10 @@ app.use(express.json({ limit: "10mb" }));
 // multer يستقبل الملف المرفوع ويحطه مؤقتًا بالذاكرة
 const upload = multer({ storage: multer.memoryStorage() });
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+// 2. تهيئة عميل Gemini باستخدام المفتاح الجديد
+// تأكد أنك سميت المتغير في Railway باسم GEMINI_API_KEY
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
 });
 
 // ---------- Route رقم 1: استخراج النص من PDF ----------
@@ -50,7 +53,7 @@ app.post("/generate-questions", async (req, res) => {
 
     const prompt = `فيما يلي نص مادة دراسية. أريدك أن تولّد ${count} أسئلة اختبارية متنوعة (اختيار من متعدد وأسئلة مقالية قصيرة) لاختبار فهم القارئ للمادة.
 
-أجب فقط بصيغة JSON صالحة بدون أي نص إضافي، بهذا الشكل بالضبط:
+يجب أن يكون الرد عبارة عن JSON صالحة ومطابقة لهذا الهيكل بالضبط:
 {
   "questions": [
     {
@@ -70,21 +73,21 @@ app.post("/generate-questions", async (req, res) => {
 نص المادة:
 ${trimmedText}`;
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2000,
-      messages: [{ role: "user", content: prompt }],
+    // 3. استدعاء موديل Gemini 1.5 Flash السريع والمجاني
+    const model = ai.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      // نطلب من Gemini إرجاع JSON نقي ومباشر بدون كود الماركداون (```json)
+      generationConfig: { responseMimeType: "application/json" }
     });
 
-    const rawText = message.content
-      .map((block) => (block.type === "text" ? block.text : ""))
-      .join("");
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const rawText = response.text();
 
-    // تنظيف الرد من أي فواصل markdown محتملة قبل تحويله JSON
-    const cleaned = rawText.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
-
+    // تحويل النص الراجع مباشرة إلى JSON وإرساله للتطبيق
+    const parsed = JSON.parse(rawText.trim());
     res.json(parsed);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "فشل توليد الأسئلة" });
@@ -96,7 +99,6 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-// نستمع على 0.0.0.0 عشان Replit يقدر يوصل للخادم من الخارج
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
