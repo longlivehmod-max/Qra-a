@@ -38,9 +38,9 @@ app.post("/generate-questions", async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
     const ai = new GoogleGenerativeAI(apiKey);
 
-    // 🌟 تم تحديث اسم الموديل إلى الصيغة المتوافقة بالكامل لتفادي خطأ 404
+    // 🌟 تم التحديث إلى الموديل المستقر والحديث لعام 2026 لتفادي حظر النسخ القديمة
     const model = ai.getGenerativeModel({ 
-      model: "gemini-1.5-flash-latest", 
+      model: "gemini-2.5-flash", 
       generationConfig: { responseMimeType: "application/json" }
     });
 
