@@ -1,26 +1,18 @@
-// ==========================================================
-// خادم بسيط له مهمتان:
-// 1) استقبال ملف PDF من التطبيق واستخراج النص منه (/extract-text)
-// 2) أخذ نص المادة وتوليد أسئلة اختبار عنه عبر Gemini (/generate-questions)
-// ==========================================================
-
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const pdfParse = require("pdf-parse");
-// 1. استدعاء مكتبة Google Gemini بدلاً من Anthropic
+// الطريقة الصحيحة والمتوافقة مع CommonJS لـ Gemini
 const { GoogleGenAI } = require("@google/generative-ai");
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-// multer يستقبل الملف المرفوع ويحطه مؤقتًا بالذاكرة
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 2. تهيئة عميل Gemini باستخدام المفتاح الجديد
-// تأكد أنك سميت المتغير في Railway باسم GEMINI_API_KEY
+// تهيئة العميل
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
@@ -32,7 +24,6 @@ app.post("/extract-text", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "لم يتم إرسال أي ملف" });
     }
     const data = await pdfParse(req.file.buffer);
-    // نرجع النص المستخرج فقط، والتطبيق يخزنه محليًا
     res.json({ text: data.text, pages: data.numpages });
   } catch (err) {
     console.error(err);
@@ -48,12 +39,11 @@ app.post("/generate-questions", async (req, res) => {
       return res.status(400).json({ error: "النص قصير جدًا لتوليد أسئلة" });
     }
 
-    // نقتطع النص إذا كان طويل جدًا (حماية بسيطة)
     const trimmedText = text.slice(0, 15000);
 
     const prompt = `فيما يلي نص مادة دراسية. أريدك أن تولّد ${count} أسئلة اختبارية متنوعة (اختيار من متعدد وأسئلة مقالية قصيرة) لاختبار فهم القارئ للمادة.
 
-يجب أن يكون الرد عبارة عن JSON صالحة ومطابقة لهذا الهيكل بالضبط:
+أجب فقط بصيغة JSON صالحة ومطابقة لهذا الهيكل تماماً وبدون أي ماركداون:
 {
   "questions": [
     {
@@ -73,10 +63,8 @@ app.post("/generate-questions", async (req, res) => {
 نص المادة:
 ${trimmedText}`;
 
-    // 3. استدعاء موديل Gemini 1.5 Flash السريع والمجاني
     const model = ai.getGenerativeModel({ 
       model: "gemini-1.5-flash",
-      // نطلب من Gemini إرجاع JSON نقي ومباشر بدون كود الماركداون (```json)
       generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -84,7 +72,6 @@ ${trimmedText}`;
     const response = await result.response;
     const rawText = response.text();
 
-    // تحويل النص الراجع مباشرة إلى JSON وإرساله للتطبيق
     const parsed = JSON.parse(rawText.trim());
     res.json(parsed);
 
@@ -96,9 +83,3 @@ ${trimmedText}`;
 
 app.get("/", (req, res) => {
   res.send("Study App Backend يعمل بنجاح ✅");
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
