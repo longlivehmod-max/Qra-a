@@ -11,57 +11,31 @@ app.use(express.json({ limit: "10mb" }));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ---------- Route رقم 1: استخراج النص من PDF ----------
 app.post("/extract-text", upload.single("file"), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "لم يتم إرسال أي ملف" });
-    }
+    if (!req.file) return res.status(400).json({ error: "لم يتم إرسال أي ملف" });
     const data = await pdfParse(req.file.buffer);
     res.json({ text: data.text, pages: data.numpages });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "فشل استخراج النص من الملف" });
+    console.error("حذث خطأ أثناء استخراج النص:", err);
+    res.status(500).json({ error: "فشل استخراج النص" });
   }
 });
 
-// ---------- Route رقم 2: توليد أسئلة عن المادة ----------
 app.post("/generate-questions", async (req, res) => {
   try {
     const { text, count = 5 } = req.body;
+    
+    // طباعة طول النص للتأكد هل تم استخراجه أم أنه فارغ
+    console.log(`--- طول النص المستلم للتوليد: ${text ? text.length : 0} حرف ---`);
+
     if (!text || text.trim().length < 20) {
+      console.log("❌ فشل التوليد: النص فارغ أو قصير جداً (احتمال ملف سكنر/صور)");
       return res.status(400).json({ error: "النص قصير جدًا لتوليد أسئلة" });
     }
 
     const trimmedText = text.slice(0, 15000);
-
-    const prompt = `فيما يلي نص مادة دراسية. أريدك أن تولّد ${count} أسئلة اختبارية متنوعة (اختيار من متعدد وأسئلة مقالية قصيرة) لاختبار فهم القارئ للمادة.
-
-أجب فقط بصيغة JSON صالحة ومطابقة لهذا الهيكل تماماً وبدون أي ماركداون:
-{
-  "questions": [
-    {
-      "type": "multiple_choice",
-      "question": "نص السؤال",
-      "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],
-      "correctAnswer": "الخيار الصحيح"
-    },
-    {
-      "type": "short_answer",
-      "question": "نص السؤال",
-      "correctAnswer": "الإجابة النموذجية"
-    }
-  ]
-}
-
-نص المادة:
-${trimmedText}`;
-
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: "API key is missing in environment variables" });
-    }
-    
     const ai = new GoogleGenerativeAI(apiKey);
 
     const model = ai.getGenerativeModel({ 
@@ -69,25 +43,22 @@ ${trimmedText}`;
       generationConfig: { responseMimeType: "application/json" }
     });
 
+    const prompt = `Generate ${count} educational questions from this text in valid JSON format. Text: ${trimmedText}`;
+
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const rawText = response.text();
 
-    const parsed = JSON.parse(rawText.trim());
-    res.json(parsed);
+    res.json(JSON.parse(rawText.trim()));
 
   } catch (err) {
-    console.error("Gemini Error:", err);
+    // 🔥 هذا السطر سيطبع لنا السبب الحقيقي والنهائي للـ Gemini Error في الـ Logs
+    console.error("🛑 خطأ صريح من جـوجـل جـمـيـنـاي:", err.message || err);
     res.status(500).json({ error: "فشل توليد الأسئلة" });
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("Study App Backend يعمل بنجاح ✅");
-});
+app.get("/", (req, res) => res.send("Backend Online ✅"));
 
-// تعديل المنفذ ليتوافق مع بوابات Railway الافتراضية بشكل كامل
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
