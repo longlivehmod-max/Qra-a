@@ -57,7 +57,6 @@ app.post("/generate-questions", async (req, res) => {
 نص المادة:
 ${trimmedText}`;
 
-    // تهيئة العميل هنا بشكل حي ومباشر لضمان قراءة المفتاح من بيئة Railway السحابية
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: "API key is missing in environment variables" });
@@ -87,7 +86,8 @@ app.get("/", (req, res) => {
   res.send("Study App Backend يعمل بنجاح ✅");
 });
 
-const PORT = process.env.PORT || 3000;
+// تعديل المنفذ ليتوافق مع بوابات Railway الافتراضية بشكل كامل
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
