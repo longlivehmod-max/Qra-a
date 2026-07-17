@@ -23,12 +23,13 @@ app.post("/extract-text", upload.single("file"), async (req, res) => {
   }
 });
 
-// ---------- Route رقم 2: توليد أسئلة عن المادة ----------
+// ---------- Route رقم 2: توليد أسئلة مخصصة عن المادة ----------
 app.post("/generate-questions", async (req, res) => {
   try {
-    const { text, count = 5 } = req.body;
+    // 🌟 استقبال نص المادة، العدد المطلوب، ونوع الأسئلة من تطبيق الموبايل
+    const { text, count = 5, questionType = "mixed" } = req.body;
     
-    console.log(`--- طول النص المستلم للتوليد: ${text ? text.length : 0} حرف ---`);
+    console.log(`--- طلب جديد | العدد: ${count} | النوع: ${questionType} | طول النص: ${text ? text.length : 0} حرف ---`);
 
     if (!text || text.trim().length < 20) {
       return res.status(400).json({ error: "النص قصير جدًا لتوليد أسئلة" });
@@ -38,15 +39,22 @@ app.post("/generate-questions", async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
     const ai = new GoogleGenerativeAI(apiKey);
 
-    // 🚀 التحديث لأحدث إصدار مستقر ومتاح حالياً في 2026 لتفادي إيقاف الموديلات القديمة
     const model = ai.getGenerativeModel({ 
-      model: "gemini-3.5-flash", 
+      model: "gemini-2.0-flash", 
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    const prompt = `فيما يلي نص مادة دراسية. أريدك أن تولّد ${count} أسئلة اختبارية متنوعة (اختيار من متعدد وأسئلة مقالية قصيرة) لاختبار فهم القارئ للمادة.
+    // 🌟 صياغة ديناميكية للبرومبت بناءً على نوع الأسئلة المختار
+    let typeInstruction = "متنوعة (اختيار من متعدد وأسئلة مقالية قصيرة)";
+    if (questionType === "mcq") {
+      typeInstruction = "خيار من متعدد (Multiple Choice) فقط";
+    } else if (questionType === "essay") {
+      typeInstruction = "مقالية قصيرة (Short Answer) فقط";
+    }
 
-أجب فقط بصيغة JSON صالحة ومطابقة لهذا الهيكل تماماً وبدون أي ماركداون:
+    const prompt = `فيما يلي نص مادة دراسية. أريدك أن تولّد ${count} أسئلة اختبارية تكون من نوع: ${typeInstruction}، لاختبار فهم القارئ للمادة بشكل دقيق.
+
+أجب فقط بصيغة JSON صالحة ومطابقة لهذا الهيكل تماماً وبدون أي ماركداون أو مقدمات:
 {
   "questions": [
     {
