@@ -3,7 +3,6 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const pdfParse = require("pdf-parse");
-// الطريقة الصحيحة والمتوافقة مع CommonJS لـ Gemini
 const { GoogleGenAI } = require("@google/generative-ai");
 
 const app = express();
@@ -12,7 +11,7 @@ app.use(express.json({ limit: "10mb" }));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// تهيئة العميل
+// تهيئة العميل لـ Gemini
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
@@ -83,3 +82,9 @@ ${trimmedText}`;
 
 app.get("/", (req, res) => {
   res.send("Study App Backend يعمل بنجاح ✅");
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
